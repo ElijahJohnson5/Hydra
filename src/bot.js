@@ -273,6 +273,11 @@ class Bot {
       this.lastNowPlayingMessage.delete();
       this.lastNowPlayingMessage = null;
     }
+
+    if (this.errorMessage != null) {
+      this.errorMessage.delete();
+      this.errorMessage = null;
+    }
   }
 
   deleteCurrentMessage(timeout = 0) {
