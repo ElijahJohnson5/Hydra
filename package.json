@@ -1,0 +1,19 @@
+{
+  "name": "hydra",
+  "version": "1.0.0",
+  "description": "Discord Music Bot",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node --experimental-json-modules ."
+  },
+  "type": "module",
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@discordjs/opus": "^0.4.0",
+    "discord.js": "^12.5.1",
+    "node-fetch": "^2.6.1",
+    "ytdl-core": "^4.4.5"
+  }
+}
