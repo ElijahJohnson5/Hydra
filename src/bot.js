@@ -17,7 +17,7 @@ class Bot {
     this.queue = [];
   }
 
-  playNextSong() {
+  async playNextSong() {
     if (this.looping) {
       if (this.dispatcher == null) {
         this.createDispatcher(this.currentSong);
@@ -43,17 +43,17 @@ class Bot {
     let song = this.queue.shift();
 
     if (this.lastNowPlayingMessage != null) {
-      this.lastNowPlayingMessage.delete();
+      await this.lastNowPlayingMessage.delete();
       this.lastNowPlayingMessage = null;
     }
 
     if (this.lastQueuedMessages.length != 0) {
-      this.lastQueuedMessages.shift().delete();
-      this.lastQueuedMessages.map((message, idx) => {
+      await this.lastQueuedMessages.shift().delete();
+      this.lastQueuedMessages.forEach(async (message, idx) => {
         let embed = new MessageEmbed();
         embed.setTitle(`Track Queued - Position ${idx + 1}`);
         embed.setDescription(`[${this.queue[idx].title}](${this.queue[idx].url})`);
-        message.edit('', { embed: embed });
+        return await message.edit(embed);
       });
     }
 
@@ -61,10 +61,7 @@ class Bot {
     embed.setTitle('Now Playing');
     embed.setDescription(`[${song.title}](${song.url})`);
 
-    this.currentMessage.channel.send('', { embed: embed }).then(message => {
-      this.lastNowPlayingMessage = message;
-    });
-
+    this.lastNowPlayingMessage = await this.currentMessage.channel.send(embed);
     if (this.dispatcher == null) {
       this.createDispatcher(song);
     } else {
@@ -74,7 +71,7 @@ class Bot {
     }
   }
 
-  play(song) {
+  async play(song, onFinished = null) {
     if (this.connection == null) {
       return;
     }
@@ -84,15 +81,12 @@ class Bot {
       embed.setTitle('Now Playing');
       embed.setDescription(`[${song.title}](${song.url})`);
   
-      this.currentMessage.channel.send('', { embed: embed }).then(message => {
-        this.lastNowPlayingMessage = message;
-      });
-
+      this.lastNowPlayingMessage = await this.currentMessage.channel.send(embed);
       if (!this.currentMessageDeleted) {
         this.currentMessage.delete({ timeout: 1000 });
         this.currentMessageDeleted = true;
       }
-      this.createDispatcher(song);
+      this.createDispatcher(song, onFinished);
     } else {
       if (this.dispatcher == null) {
         this.playNextSong();
@@ -104,9 +98,7 @@ class Bot {
       embed.setTitle(`Track Queued - Position ${this.queue.length}`);
       embed.setDescription(`[${song.title}](${song.url})`);
       
-      this.currentMessage.channel.send('', { embed: embed }).then(message => {
-        this.lastQueuedMessages.push(message);
-      });
+      this.lastQueuedMessages.push(await this.currentMessage.channel.send(embed));
 
       if (!this.currentMessageDeleted) {
         this.currentMessage.delete({ timeout: 1000 });
@@ -130,14 +122,14 @@ class Bot {
         let embed = new MessageEmbed();
         embed.setTitle('Paused');
         embed.setDescription(`[${this.currentSong.title}](${this.currentSong.url})`);
-        this.lastNowPlayingMessage.edit('', { embed: embed });
+        this.lastNowPlayingMessage.edit(embed);
       } else {
         this.dispatcher.resume();
 
         let embed = new MessageEmbed();
         embed.setTitle('Now Playing');
         embed.setDescription(`[${this.currentSong.title}](${this.currentSong.url})`);
-        this.lastNowPlayingMessage.edit('', { embed: embed });
+        this.lastNowPlayingMessage.edit(embed);
       }
     }
   }
@@ -145,51 +137,61 @@ class Bot {
   sendSearchResults(results) {
     let embed = new MessageEmbed();
     let embedString = '';
-    for (let i = 0; i < 10; i++) {
+
+    let i = 0;
+    do {
       const currentItem = results.items[i];
-      embedString += `${i+1}) [${currentItem.title}](${currentItem.url})\n`
-    }
-    
-    embed.setTitle('Search Results');
-    embed.setDescription(`Reply with the chosen song number or 'cancel'`);
-    embed.addField('Choices', embedString);
-    this.currentMessage.channel.send('', { embed: embed }).then(message => {
+      const newLine = `${i+1}) [${currentItem.title}](${currentItem.url})\n`;
+
+      if (newLine.length + embedString.length > 2048) {
+        break;
+      }
+
+      embedString += newLine;
+      i++;
+    } while (embedString.length < 2048)
+
+    embed.setTitle(`Search Results\nReply with the chosen song number or 'cancel'`);
+    embed.setDescription(embedString);
+    this.currentMessage.channel.send(embed).then(message => {
       let invalidSelectionMessage = null;
-      const collector = new MessageCollector(message.channel, m => m.author.id === this.currentMessage.author.id);
+      const collector = new MessageCollector(message.channel, m => m.author.id === this.currentMessage.author.id, { time: 10000 });
       collector.on('collect', selectionMessage => {
         const content = selectionMessage.content.toLowerCase();
         if (invalidSelectionMessage != null) {
           invalidSelectionMessage.delete();
         }
-        if (content == 'cancel') {
-          message.delete();
+        if (content == 'cancel' || content == 'c') {
           selectionMessage.delete();
-          if (!this.currentMessageDeleted) {
-            this.currentMessage.delete();
-            this.currentMessageDeleted = true;
-          }
           collector.stop();
           return;
         }
 
-        const selection = parseInt(content, 10) - 1;
-        if (selection < 0 || selection >= 10) {
+        let selection = parseInt(content, 10) || 0;
+        selection--;
+        if (selection < 0 || selection >= i + 1) {
           selectionMessage.delete({ timeout: 5000 });
           let embed = new MessageEmbed();
           embed.addField(`Invalid Selection`, `Select a number between 1 and 10`);
-          selectionMessage.channel.send('', { embed: embed }).then(message => {
+          selectionMessage.channel.send(embed).then(message => {
             invalidSelectionMessage = message;
           });
         } else {
           selectionMessage.delete();
-          message.delete();
           this.play(results.items[selection]);
+          collector.stop();
         }
+      });
+
+      collector.on('end', () => {
+        message.delete();
+        this.deleteCurrentMessage();
+        collector.stop();
       });
     });
   }
 
-  createDispatcher(song) {
+  createDispatcher(song, onFinished = null) {
     if (song.url.includes('www.youtube.com')) {
       this.dispatcher = this.connection.play(ytdl(song.url, { filter: 'audioonly'}), { volume: 0.2 });
     } else if (song.url.includes('sounds')) {
@@ -198,7 +200,7 @@ class Bot {
 
     this.currentSong = song;
     this.dispatcher.on('start', () => this.onDispatcherStart());
-    this.dispatcher.on('finish', () => this.onDispathcerFinish());
+    this.dispatcher.on('finish', () => this.onDispathcerFinish(onFinished));
     this.dispatcher.on('error', error => this.onDispatcherError(error))
   }
 
@@ -206,9 +208,13 @@ class Bot {
     console.log("Started Playing");
   }
 
-  onDispathcerFinish() {
+  onDispathcerFinish(onFinished = null) {
     console.log("Dispatcher finished");
     this.playNextSong();
+
+    if (onFinished != null) {
+      onFinished();
+    }
   }
 
   onDispatcherError(error) {
@@ -298,7 +304,7 @@ class Bot {
       let embed = new MessageEmbed();
       embed.setTitle(`Error with ${command}`);
       embed.setDescription(content);
-      this.currentMessage.reply('', { embed: embed }).then(message => {
+      this.currentMessage.reply(embed).then(message => {
         this.errorMessage = message;
       });
     }

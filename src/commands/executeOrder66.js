@@ -5,7 +5,7 @@ const __dirname = Path.resolve();
 export default {
   name: 'eo66',
   description: 'Execute Order 66!',
-  roles: ['Vice President', 'Majority Whip Dominic Vigil (R-AZ)', 'Senator Brandon Jimenez (R-AZ)', 'Minority Whip Matthew Dalton (D-NV)'],
+  roles: ['Vice President', 'me nigga', 'Senator Brandon Jimenez (R-AZ)', 'Minority Whip Matthew Dalton (D-NV)'],
   async execute(bot, _args) {
     bot.clearQueue();
     bot.deleteAllMessages();

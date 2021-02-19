@@ -9,16 +9,13 @@ export default {
   description: 'Searches for a song!',
   async execute(bot, args) {
     if (args.length === 0) {
-      bot.deleteCurrentMessage(5000);
-      bot.currentMessage.reply('You need to specify search terms')
-        .then(message => message.delete({ timeout: 5000 }));
+      bot.sendErrorMessage(this.name, `You need to specify search terms`);
       return;
     }
 
     if (!(await bot.connect(bot.currentMessage.member.voice.channel))) {
-      bot.deleteCurrentMessage(5000);
-      bot.currentMessage.reply('You need to join a voice channel first!')
-        .then(message => message.delete({ timeout: 5000 }));
+      bot.sendErrorMessage(this.name, `You need to join a voice channel first!`);
+      return;
     }
 
     let searchString = "";
@@ -26,7 +23,7 @@ export default {
 
     for (const arg of args) {
       if (!arg.startsWith('-')) {
-        searchString += arg;
+        searchString += arg + " ";
       } else {
         extraArgs.push(arg);
       }

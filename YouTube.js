@@ -53,6 +53,17 @@ class YouTube {
     return new VideoList(json, (item => item.id.videoId));
   }
 
+  async findVideoById(id) {
+    const response = await fetch(`https://youtube.googleapis.com/youtube/v3/videos?part=snippet&id=${id}&key=${this.apiKey}`);
+    const json = await response.json();
+
+    if (!json.items) {
+      return null;
+    }
+
+    return new VideoList(json, (item => item.id));
+  }
+
   async getPlaylistItems(playlistId) {
     const response = await fetch(`https://youtube.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${playlistId}&key=${this.apiKey}`);
     const json = await response.json();

@@ -11,16 +11,13 @@ export default {
   description: 'Play a song!',
   async execute(bot, args) {
     if (args.length === 0) {
-      bot.deleteCurrentMessage(5000);
-      bot.currentMessage.reply('You need to specify a link or search terms')
-        .then(message => message.delete({ timeout: 5000 }));
+      bot.sendErrorMessage(this.name, 'You need to specify a link or search terms');
       return;
     }
 
     if (!(await bot.connect(bot.currentMessage.member.voice.channel))) {
-      bot.deleteCurrentMessage(5000);
-      bot.currentMessage.reply('You need to join a voice channel first!')
-        .then(message => message.delete({ timeout: 5000 }));
+      bot.sendErrorMessage(this.name, 'You need to join a voice channel first!');
+      return;
     }
 
     let searchString = "";
@@ -28,7 +25,7 @@ export default {
 
     for (const arg of args) {
       if (!arg.startsWith('-')) {
-        searchString += arg;
+        searchString += arg + " ";
       } else {
         extraArgs.push(arg);
       }
@@ -38,7 +35,7 @@ export default {
       if (searchString.includes("list=")) {
         const searchParams = new URLSearchParams(searchString.substring(searchString.indexOf('?') + 1));
         const playlistId = searchParams.get('list');
-        const results = await youtube.getPlaylistItems(playlistId);
+        const results = await youtube.getPlaylistItems(playlistId.trim());
 
         if (results == null) {
           bot.sendErrorMessage(this.name, 'Error occured while trying to access youtube');
@@ -49,10 +46,14 @@ export default {
         }
 
         for (let i = 0; i < results.items.length; i++) {
-          bot.play(results.items[i]);
+          await bot.play(results.items[i]);
         }
       } else {
-        const results = await youtube.searchVideos(searchString);
+        const searchParams = new URLSearchParams(searchString.substring(searchString.indexOf('?') + 1));
+        const videoId = searchParams.get('v');
+
+        const results = await youtube.findVideoById(videoId.trim());
+
         if (results == null) {
           bot.sendErrorMessage(this.name, 'Error occured while trying to access youtube');
           return;
@@ -60,7 +61,7 @@ export default {
           bot.sendErrorMessage(this.name, 'Could not find a song form that link make sure you have entered the correct link');
           return;
         }
-        bot.play(results.first);
+        await bot.play(results.first);
       }
     } else {
       const results = await youtube.searchVideos(searchString);
@@ -71,7 +72,7 @@ export default {
         bot.sendErrorMessage(this.name, 'Could not find any results for that search term');
         return;
       }
-      bot.play(results.first);
+      await bot.play(results.first);
     }
   },
 };
