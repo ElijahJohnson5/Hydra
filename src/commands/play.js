@@ -45,9 +45,14 @@ export default {
           return;
         }
 
-        for (let i = 0; i < results.items.length; i++) {
-          await bot.play(results.items[i]);
+        await youtube.getNextPlaylistItems(results);
+
+        for (let i = 0; i < results.items.length && i < 5; i++) {
+          const song = results.removeFirst();
+          song.onFinished = bot.playNextSongInPlaylist(i, results, youtube);
+          await bot.play(song);
         }
+
       } else {
         const searchParams = new URLSearchParams(searchString.substring(searchString.indexOf('?') + 1));
         const videoId = searchParams.get('v');

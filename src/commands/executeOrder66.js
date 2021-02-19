@@ -9,7 +9,10 @@ export default {
   async execute(bot, _args) {
     bot.clearQueue();
     bot.deleteAllMessages();
-    bot.skip();
+    if (bot.currentSong != null) {
+      bot.currentSong.onFinished = null;
+    }
+    bot.skip(0);
     if (!(await bot.connect(bot.currentMessage.member.voice.channel))) {
       bot.deleteCurrentMessage(5000);
       bot.currentMessage.reply('Join a voice channel to hear a special message next time')

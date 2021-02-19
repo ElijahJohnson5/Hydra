@@ -8,5 +8,6 @@ import leave from './leave.js';
 import loop from './loop.js';
 import stop from './stop.js';
 import seaShanty from './seaShanty.js';
+import skipTo from './skipTo.js';
 
-export default [play, skip, executeOrder66, pause, resume, search, leave, loop, stop, seaShanty];
+export default [play, skip, executeOrder66, pause, resume, search, leave, loop, stop, seaShanty, skipTo];

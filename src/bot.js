@@ -71,7 +71,7 @@ class Bot {
     }
   }
 
-  async play(song, onFinished = null) {
+  async play(song) {
     if (this.connection == null) {
       return;
     }
@@ -86,12 +86,8 @@ class Bot {
         this.currentMessage.delete({ timeout: 1000 });
         this.currentMessageDeleted = true;
       }
-      this.createDispatcher(song, onFinished);
+      this.createDispatcher(song);
     } else {
-      if (this.dispatcher == null) {
-        this.playNextSong();
-      }
-
       this.queue.push(song);
 
       let embed = new MessageEmbed();
@@ -109,9 +105,14 @@ class Bot {
 
   skip(skipIndex) {
     if (this.dispatcher != null && skipIndex == 0) {
+      // Skip current song
       this.dispatcher.pause();
+      if (this.currentSong.onFinished != null) {
+        this.currentSong.onFinished();
+      }
       this.playNextSong();
     } else if (this.dispatcher != null && this.queue.length >= skipIndex) {
+      // Skip certain song in queue
       this.queue.splice(skipIndex - 1, 1);
       this.lastQueuedMessages[skipIndex - 1].delete();
       this.lastQueuedMessages.splice(skipIndex - 1, 1);
@@ -122,6 +123,46 @@ class Bot {
         return await message.edit(embed);
       });
     }
+  }
+
+  skipTo(skipToIndex) {
+    if (this.dispatcher != null && this.queue.length > skipToIndex) {
+      this.dispatcher.pause();
+      if (this.currentSong.onFinished != null) {
+        this.currentSong.onFinished();
+      }
+      this.lastQueuedMessages.splice(0, skipToIndex).map((message) => {
+        message.delete();
+      });
+      this.queue.splice(0, skipToIndex).map((song) => {
+        if (song.onFinished != null) {
+          song.onFinished();
+        }
+      });
+      this.playNextSong();
+    }
+  }
+
+  playNextSongInPlaylist(index, playlist, youtube) {
+    return () => {
+      console.log(`Playing next song in playlist`);
+      if (index == 0) {
+        youtube.getNextPlaylistItems(playlist).then(() => {
+          if (playlist.items.length !== 0) {
+            const song = playlist.removeFirst();
+            song.onFinished = this.playNextSongInPlaylist(index, playlist, youtube);
+            this.play(song);
+          }
+        });
+      } else {
+        if (playlist.items.length !== 0) {
+          const song = playlist.removeFirst();
+          song.onFinished = this.playNextSongInPlaylist(index, playlist, youtube);
+          this.play(song);
+        }
+      }
+
+    };
   }
 
   pause(paused) {
@@ -201,7 +242,7 @@ class Bot {
     });
   }
 
-  createDispatcher(song, onFinished = null) {
+  createDispatcher(song) {
     if (song.url.includes('www.youtube.com')) {
       this.dispatcher = this.connection.play(ytdl(song.url, { filter: 'audioonly'}), { volume: 0.2 });
     } else if (song.url.includes('sounds')) {
@@ -210,7 +251,7 @@ class Bot {
 
     this.currentSong = song;
     this.dispatcher.on('start', () => this.onDispatcherStart());
-    this.dispatcher.on('finish', () => this.onDispathcerFinish(onFinished));
+    this.dispatcher.on('finish', () => this.onDispathcerFinish());
     this.dispatcher.on('error', error => this.onDispatcherError(error))
   }
 
@@ -218,12 +259,12 @@ class Bot {
     console.log("Started Playing");
   }
 
-  onDispathcerFinish(onFinished = null) {
+  onDispathcerFinish() {
     console.log("Dispatcher finished");
     this.playNextSong();
 
-    if (onFinished != null) {
-      onFinished();
+    if (this.currentSong.onFinished != null) {
+      this.currentSong.onFinished();
     }
   }
 
