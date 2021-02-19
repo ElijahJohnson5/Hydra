@@ -107,10 +107,20 @@ class Bot {
     }
   }
 
-  skip() {
-    if (this.dispatcher != null) {
+  skip(skipIndex) {
+    if (this.dispatcher != null && skipIndex == 0) {
       this.dispatcher.pause();
       this.playNextSong();
+    } else if (this.dispatcher != null && this.queue.length >= skipIndex) {
+      this.queue.splice(skipIndex - 1, 1);
+      this.lastQueuedMessages[skipIndex - 1].delete();
+      this.lastQueuedMessages.splice(skipIndex - 1, 1);
+      this.lastQueuedMessages.forEach(async (message, idx) => {
+        let embed = new MessageEmbed();
+        embed.setTitle(`Track Queued - Position ${idx + 1}`);
+        embed.setDescription(`[${this.queue[idx].title}](${this.queue[idx].url})`);
+        return await message.edit(embed);
+      });
     }
   }
 
